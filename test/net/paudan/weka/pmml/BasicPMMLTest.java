@@ -18,7 +18,7 @@ public class BasicPMMLTest {
     
     @Test
     public void testIrisReflection() throws Exception {
-        File dataset = new File("test//resources//iris_model_builder.arff");
+        File dataset = new File("test//resources//credit-german.arff");
         Instances data;
         try (BufferedReader reader = new BufferedReader(new FileReader(dataset))) {
             data = new Instances(reader);
@@ -30,7 +30,7 @@ public class BasicPMMLTest {
     
     @Test
     public void testIrisWrapper() throws Exception {
-        File dataset = new File("test//resources//iris_model_builder.arff");
+        File dataset = new File("test//resources//credit-german.arff");
         Instances data;
         try (BufferedReader reader = new BufferedReader(new FileReader(dataset))) {
             data = new Instances(reader);
@@ -66,41 +66,30 @@ public class BasicPMMLTest {
     
     @Test
     public void testClassifierEquivalence() throws Exception {
-        File dataset = new File("test//resources//iris_model_builder.arff");
+        File dataset = new File("test//resources//credit-german.arff");
         Instances data;
         try (BufferedReader reader = new BufferedReader(new FileReader(dataset))) {
             data = new Instances(reader);
             data.setClassIndex(data.numAttributes() - 1);
             AbstractClassifier classifier = testAbstractClassifier(new RandomForest(), data);
-            File file = Files.createTempFile("reflect_iris_pmml", ".xml").toFile();
+            File file = Files.createTempFile("reflect_german_pmml", ".xml").toFile();
             System.err.println("writing to file: " + file.getAbsolutePath());
             new RandomForestPMMLProducer().produce((RandomForest) classifier, file);
             RandomForest rf1 = new RandomForestPMMLConsumer().consume(file);
             
             AbstractClassifier classifier2 = testAbstractClassifier(new RandomForestWrapper(), data);
-            file = Files.createTempFile("wrapper_frf_iris_pmml", ".xml").toFile();
+            file = Files.createTempFile("wrapper_german_iris_pmml", ".xml").toFile();
             System.err.println("writing to file: " + file.getAbsolutePath());
             new net.paudan.weka.pmml.wrapper.RandomForestPMMLProducer().produce((RandomForestWrapper) classifier2, file);
             RandomForestWrapper rf2 = new net.paudan.weka.pmml.wrapper.RandomForestPMMLConsumer().consume(file);
 
-            Enumeration<String> measures = rf1.enumerateMeasures();
-            while (measures.hasMoreElements())
-                System.out.println(measures.nextElement());
-            System.out.println(rf2.toString());
+            assertEquals(rf1.numElements(), rf2.numElements());
         }
         
     }
     
     protected AbstractClassifier testAbstractClassifier(AbstractClassifier classifier, Instances instances) throws Exception {
-        /*classifier.setOptions(new String[]{"-I", "1", "-K", "1", "-S", "1", "-depth", "1"});
-        classifier.buildClassifier(instances);
-        testConversion(classifier, instances);
-
-        classifier.setOptions(new String[]{"-I", "2", "-K", "2", "-S", "2", "-depth", "2"});
-        classifier.buildClassifier(instances);
-        testConversion(classifier, instances);*/
-
-        classifier.setOptions(new String[]{"-I", ""+instances.numInstances(), "-K", ""+instances.numInstances(), "-S", "4", "-depth", "0"});
+        classifier.setOptions(new String[]{"-I", "10", "-K", "0", "-S", "4", "-depth", "0", "-print"});
         classifier.buildClassifier(instances);
         return classifier;
         

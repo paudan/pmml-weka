@@ -8,10 +8,7 @@ import javax.xml.transform.stream.StreamResult;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
-import static net.paudan.weka.pmml.PMMLConversionCommons.TRAINING_PROPORTION_ELEMENT;
-import static net.paudan.weka.pmml.PMMLConversionCommons.addScoreDistribution;
-import static net.paudan.weka.pmml.PMMLConversionCommons.buildPMMLHeader;
-import static net.paudan.weka.pmml.PMMLConversionCommons.leafScoreFromDistribution;
+import net.paudan.weka.pmml.PMMLUtils;
 import net.paudan.weka.pmml.PMMLConversionException;
 import net.paudan.weka.pmml.PMMLProducer;
 
@@ -48,7 +45,7 @@ import weka.core.Instances;
 /**
  * A producer that converts a {@link weka.classifiers.trees.RandomForest} instance to PMML.
  *
- * @author Ricardo Ferreira (ricardo.ferreira@feedzai.com), modifications by Paulius Danenas
+ * @author Paulius Danenas (danpaulius@gmail.com), based on code by Ricardo Ferreira (ricardo.ferreira@feedzai.com)
  */
 public class RandomForestPMMLProducer implements PMMLProducer<RandomForestWrapper> {
 
@@ -73,7 +70,7 @@ public class RandomForestPMMLProducer implements PMMLProducer<RandomForestWrappe
         Classifier[] baggingClassifiers = RandomForestUtils.getBaggingClassifiers(randomForestClassifier.getM_bagger());
         Instances data = ((RandomTreeWrapper) baggingClassifiers[0]).getM_Info();
 
-        Header header = buildPMMLHeader("Weka RandomForest as PMML.");
+        Header header = PMMLUtils.buildPMMLHeader("Weka RandomForest as PMML");
 
         PMML pmml = new PMML("4.2", header, new DataDictionary());
 
@@ -176,11 +173,11 @@ public class RandomForestPMMLProducer implements PMMLProducer<RandomForestWrappe
      * @return The incremented Id given to recursively created {@link org.dmg.pmml.Node PMML Nodes}.
      */
     private static int buildTreeNode(RandomTreeWrapper tree, RandomTreeWrapper.TreeWrapper node, int nodeId, Node parentPMMLNode) {
-        addScoreDistribution(parentPMMLNode, node.getM_ClassDistribution(), tree.getM_Info());
+        PMMLUtils.addScoreDistribution(parentPMMLNode, node.getM_ClassDistribution(), tree.getM_Info());
 
         if (node.getM_Attribute() == -1) {
             // Leaf: Add the node's score.
-            parentPMMLNode.setScore(leafScoreFromDistribution(node.getM_ClassDistribution(), tree.getM_Info()));
+            parentPMMLNode.setScore(PMMLUtils.leafScoreFromDistribution(node.getM_ClassDistribution(), tree.getM_Info()));
             return nodeId;
         }
 
@@ -245,7 +242,7 @@ public class RandomForestPMMLProducer implements PMMLProducer<RandomForestWrappe
 
             // Training proportion extension.
             Extension ext = new Extension();
-            ext.setName(TRAINING_PROPORTION_ELEMENT);
+            ext.setName(PMMLUtils.TRAINING_PROPORTION_ELEMENT);
             ext.setValue(String.valueOf(node.getM_Prop()[i]));
             child.addExtensions(ext);
 
@@ -304,10 +301,10 @@ public class RandomForestPMMLProducer implements PMMLProducer<RandomForestWrappe
 
         // Training proportion extension.
         Extension ext1 = new Extension();
-        ext1.setName(TRAINING_PROPORTION_ELEMENT);
+        ext1.setName(PMMLUtils.TRAINING_PROPORTION_ELEMENT);
         ext1.setValue(String.valueOf(node.getM_Prop()[0]));
         Extension ext2 = new Extension();
-        ext2.setName(TRAINING_PROPORTION_ELEMENT);
+        ext2.setName(PMMLUtils.TRAINING_PROPORTION_ELEMENT);
         ext2.setValue(String.valueOf(node.getM_Prop()[1]));
         nodeLo.addExtensions(ext1, ext2);
 

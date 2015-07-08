@@ -10,19 +10,11 @@ import javax.xml.transform.stream.StreamSource;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import static net.paudan.weka.pmml.PMMLConversionCommons.buildInstances;
-import static net.paudan.weka.pmml.PMMLConversionCommons.getClassDistribution;
-import static net.paudan.weka.pmml.PMMLConversionCommons.getClassIndex;
-import static net.paudan.weka.pmml.PMMLConversionCommons.getMiningModel;
-import static net.paudan.weka.pmml.PMMLConversionCommons.getNodeTrainingProportion;
 import org.dmg.pmml.MiningModel;
 import org.dmg.pmml.Node;
 import org.dmg.pmml.PMML;
@@ -82,7 +74,7 @@ public class RandomForestPMMLConsumer implements PMMLConsumer<RandomForest> {
     @Override
     public RandomForest consume(PMML pmml) throws PMMLConversionException {
         try {
-            MiningModel miningModel = getMiningModel(pmml);
+            MiningModel miningModel = PMMLUtils.getMiningModel(pmml);
             List<Segment> segments = miningModel.getSegmentation().getSegments();
             
             int m_numTrees = segments.size();
@@ -102,7 +94,7 @@ public class RandomForestPMMLConsumer implements PMMLConsumer<RandomForest> {
                 throw new PMMLConversionException("Failed to initialize bagging classifiers.", e);
             }
             
-            Instances instances = buildInstances(pmml.getDataDictionary());
+            Instances instances = PMMLUtils.buildInstances(pmml.getDataDictionary());
             Classifier[] baggingClassifiers = RandomForestUtils.getBaggingClassifiers(bagger);
             for (int i = 0; i < baggingClassifiers.length; i++) {
                 RandomTree root = (RandomTree) baggingClassifiers[i];
@@ -127,7 +119,7 @@ public class RandomForestPMMLConsumer implements PMMLConsumer<RandomForest> {
             throws NoSuchFieldException, IllegalArgumentException, IllegalAccessException, ClassNotFoundException, 
             NoSuchMethodException, InstantiationException, InvocationTargetException {
         Instances treeInstances = new Instances(instances);
-        treeInstances.setClassIndex(getClassIndex(instances, treeModel));
+        treeInstances.setClassIndex(PMMLUtils.getClassIndex(instances, treeModel));
 
         Field field = RandomTree.class.getDeclaredField("m_Info");
         field.setAccessible(true);
@@ -159,7 +151,7 @@ public class RandomForestPMMLConsumer implements PMMLConsumer<RandomForest> {
         
         Field field = treeClass.getDeclaredField("m_ClassDistribution");
         field.setAccessible(true);
-        double [] distribution = getClassDistribution(pmmlNode);
+        double [] distribution = PMMLUtils.getClassDistribution(pmmlNode);
         if (distribution != null && distribution.length > 0) {
             Object m_ClassDistribution = Array.newInstance(double.class, distribution.length);
             for (int i = 0; i < distribution.length; i++)
@@ -213,8 +205,8 @@ public class RandomForestPMMLConsumer implements PMMLConsumer<RandomForest> {
                 field = treeClass.getDeclaredField("m_Prop");
                 field.setAccessible(true);
                 Object m_Props = Array.newInstance(double.class, 2);
-                Array.setDouble(m_Props, 0, getNodeTrainingProportion(left));
-                Array.setDouble(m_Props, 1, getNodeTrainingProportion(right));
+                Array.setDouble(m_Props, 0, PMMLUtils.getNodeTrainingProportion(left));
+                Array.setDouble(m_Props, 1, PMMLUtils.getNodeTrainingProportion(right));
                 field.set(treeNode, m_Props);
                 
             } else if (attribute.isNominal()) {
@@ -227,7 +219,7 @@ public class RandomForestPMMLConsumer implements PMMLConsumer<RandomForest> {
                     int valueIndex = attribute.indexOfValue(predicate.getValue());
                     
                     Array.set(m_Successors, valueIndex, buildRandomTreeNode(tree, child));
-                    Array.set(m_Props, valueIndex, getNodeTrainingProportion(child));
+                    Array.set(m_Props, valueIndex, PMMLUtils.getNodeTrainingProportion(child));
                 }
                 
                 field = treeClass.getDeclaredField("m_Successors");

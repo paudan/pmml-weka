@@ -30,7 +30,7 @@ import weka.core.Utils;
  *
  * @author Ricardo Ferreira (ricardo.ferreira@feedzai.com)
  */
-public final class PMMLConversionCommons {
+public final class PMMLUtils {
 
     public enum Algorithm {
 

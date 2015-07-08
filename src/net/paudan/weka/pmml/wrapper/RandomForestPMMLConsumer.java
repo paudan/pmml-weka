@@ -13,11 +13,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.util.List;
 import net.paudan.weka.pmml.PMMLConsumer;
-import static net.paudan.weka.pmml.PMMLConversionCommons.buildInstances;
-import static net.paudan.weka.pmml.PMMLConversionCommons.getClassDistribution;
-import static net.paudan.weka.pmml.PMMLConversionCommons.getClassIndex;
-import static net.paudan.weka.pmml.PMMLConversionCommons.getMiningModel;
-import static net.paudan.weka.pmml.PMMLConversionCommons.getNodeTrainingProportion;
+import net.paudan.weka.pmml.PMMLUtils;
 import net.paudan.weka.pmml.PMMLConversionException;
 import weka.classifiers.RandomForestWrapper;
 import weka.classifiers.RandomTreeWrapper;
@@ -26,8 +22,7 @@ import weka.core.Instances;
 /**
  * A consumer that converts PMML to a {@link weka.classifiers.trees.RandomForest} instance.
  *
- * @author Ricardo Ferreira (ricardo.ferreira@feedzai.com)
- * @since 1.0.4
+ * @author Paulius Danenas (danpaulius@gmail.com), based on code by Ricardo Ferreira (ricardo.ferreira@feedzai.com)
  */
 public class RandomForestPMMLConsumer implements PMMLConsumer<RandomForestWrapper> {
 
@@ -71,7 +66,7 @@ public class RandomForestPMMLConsumer implements PMMLConsumer<RandomForestWrappe
 
     @Override
     public RandomForestWrapper consume(PMML pmml) throws PMMLConversionException {
-        MiningModel miningModel = getMiningModel(pmml);
+        MiningModel miningModel = PMMLUtils.getMiningModel(pmml);
         List<Segment> segments = miningModel.getSegmentation().getSegments();
 
         int m_numTrees = segments.size();
@@ -88,7 +83,7 @@ public class RandomForestPMMLConsumer implements PMMLConsumer<RandomForestWrappe
             throw new PMMLConversionException("Failed to initialize bagging classifiers.", e);
         }
 
-        Instances instances = buildInstances(pmml.getDataDictionary());
+        Instances instances = PMMLUtils.buildInstances(pmml.getDataDictionary());
 
         Classifier[] baggingClassifiers = RandomForestUtils.getBaggingClassifiers(randomForest.getM_bagger());
 
@@ -110,7 +105,7 @@ public class RandomForestPMMLConsumer implements PMMLConsumer<RandomForestWrappe
      */
     private static RandomTreeWrapper buildRandomTree(RandomTreeWrapper root, Instances instances, TreeModel treeModel) {
         Instances treeInstances = new Instances(instances);
-        treeInstances.setClassIndex(getClassIndex(instances, treeModel));
+        treeInstances.setClassIndex(PMMLUtils.getClassIndex(instances, treeModel));
 
         root.setM_Info(treeInstances);
         root.setM_Tree(buildRandomTreeNode(root, treeModel.getNode()));
@@ -129,7 +124,7 @@ public class RandomForestPMMLConsumer implements PMMLConsumer<RandomForestWrappe
     private static RandomTreeWrapper.TreeWrapper buildRandomTreeNode(RandomTreeWrapper tree, Node pmmlNode) {
         RandomTreeWrapper.TreeWrapper treeNode = tree.new TreeWrapper();
         //Set the class distribution.
-        treeNode.setM_ClassDistribution(getClassDistribution(pmmlNode));
+        treeNode.setM_ClassDistribution(PMMLUtils.getClassDistribution(pmmlNode));
 
         Instances instances = tree.getM_Info();
 
@@ -161,7 +156,8 @@ public class RandomForestPMMLConsumer implements PMMLConsumer<RandomForestWrappe
 
                 treeNode.setM_SplitPoint(splitPoint);
                 treeNode.setM_Successors(new RandomTreeWrapper.TreeWrapper[]{buildRandomTreeNode(tree, left), buildRandomTreeNode(tree, right)});
-                treeNode.setM_Prop(new double[]{getNodeTrainingProportion(left), getNodeTrainingProportion(right)});
+                treeNode.setM_Prop(new double[]{PMMLUtils.getNodeTrainingProportion(left), 
+                    PMMLUtils.getNodeTrainingProportion(right)});
             } else if (attribute.isNominal()) {
 
                 treeNode.setM_Successors(new RandomTreeWrapper.TreeWrapper[children.size()]);
@@ -172,7 +168,7 @@ public class RandomForestPMMLConsumer implements PMMLConsumer<RandomForestWrappe
                     int valueIndex = attribute.indexOfValue(predicate.getValue());
                     
                     treeNode.setM_Successor(buildRandomTreeNode(tree, child), valueIndex);
-                    treeNode.setM_Prop(getNodeTrainingProportion(child), valueIndex);
+                    treeNode.setM_Prop(PMMLUtils.getNodeTrainingProportion(child), valueIndex);
                 }
             } else {
                 throw new RuntimeException("Attribute type not supported: " + attribute);
