@@ -10,11 +10,14 @@ import javax.xml.transform.stream.StreamSource;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import static net.paudan.weka.pmml.PMMLConversionCommons.buildInstances;
 import static net.paudan.weka.pmml.PMMLConversionCommons.getClassDistribution;
 import static net.paudan.weka.pmml.PMMLConversionCommons.getClassIndex;
@@ -105,7 +108,6 @@ public class RandomForestPMMLConsumer implements PMMLConsumer<RandomForest> {
                 RandomTree root = (RandomTree) baggingClassifiers[i];
                 buildRandomTree(root, instances, (TreeModel) segments.get(i).getModel());
             }
-            
             return randomForest;
         } catch (NoSuchFieldException | SecurityException | IllegalArgumentException | IllegalAccessException |
                 ClassNotFoundException | NoSuchMethodException | InstantiationException | InvocationTargetException ex) {
@@ -179,7 +181,7 @@ public class RandomForestPMMLConsumer implements PMMLConsumer<RandomForest> {
 
             field = treeClass.getDeclaredField("m_Attribute");
             field.setAccessible(true);
-            field.set(treeNode, attribute.index());
+            field.setInt(treeNode, attribute.index());
 
             if (attribute.isNumeric()) {
 
@@ -225,7 +227,7 @@ public class RandomForestPMMLConsumer implements PMMLConsumer<RandomForest> {
                     int valueIndex = attribute.indexOfValue(predicate.getValue());
                     
                     Array.set(m_Successors, valueIndex, buildRandomTreeNode(tree, child));
-                    Array.setDouble(m_Props, valueIndex, getNodeTrainingProportion(child));
+                    Array.set(m_Props, valueIndex, getNodeTrainingProportion(child));
                 }
                 
                 field = treeClass.getDeclaredField("m_Successors");
@@ -237,7 +239,7 @@ public class RandomForestPMMLConsumer implements PMMLConsumer<RandomForest> {
                 field.set(treeNode, m_Props);
             } else {
                 throw new RuntimeException("Attribute type not supported: " + attribute);
-            }
+            }               
         }
 
         return treeNode;

@@ -21,6 +21,8 @@
  */
 package weka.classifiers;
 
+import weka.classifiers.trees.RandomTree;
+
 /**
  * Utility classes to deal with the Weka API.
  *
