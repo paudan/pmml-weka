@@ -1,6 +1,5 @@
 # pmml-weka
-PMML support for Weka classifiers
+PMML support for Weka classifiers, using Weka 3.7 implementation and JPMML framework
 
-Currently only RandomForest classifier (export to PMML) is supported
+Currently only RandomForest (exporting - both reflection and wrapper-based, importing - wrapper-based) is supported
 
-Based on Weka 3.7.10 implementation and JPMML framework
