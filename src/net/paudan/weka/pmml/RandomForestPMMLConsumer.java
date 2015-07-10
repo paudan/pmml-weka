@@ -10,10 +10,7 @@ import javax.xml.transform.stream.StreamSource;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.lang.reflect.Array;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
 import java.util.List;
 import org.dmg.pmml.MiningModel;
 import org.dmg.pmml.Node;
@@ -22,8 +19,9 @@ import org.dmg.pmml.Predicate;
 import org.dmg.pmml.Segment;
 import org.dmg.pmml.SimplePredicate;
 import org.dmg.pmml.TreeModel;
+import weka.classifiers.RandomForestWrapper;
+import weka.classifiers.RandomTreeWrapper;
 import weka.classifiers.trees.RandomForest;
-import weka.classifiers.trees.RandomTree;
 import weka.core.Instances;
 
 /**
@@ -74,59 +72,58 @@ public class RandomForestPMMLConsumer implements PMMLConsumer<RandomForest> {
     @Override
     public RandomForest consume(PMML pmml) throws PMMLConversionException {
         try {
-            MiningModel miningModel = PMMLUtils.getMiningModel(pmml);
-            List<Segment> segments = miningModel.getSegmentation().getSegments();
-            
-            int m_numTrees = segments.size();
-            
+            RandomForestWrapper wrapper = consumeWrapper(pmml);
             RandomForest randomForest = new RandomForest();
-            Bagging bagger = new Bagging();
-            bagger.setNumIterations(m_numTrees);
-            bagger.setClassifier(new RandomTree());
             
             Field field = RandomForest.class.getDeclaredField("m_bagger");
             field.setAccessible(true);
-            field.set(randomForest, bagger);
+            field.set(randomForest, wrapper.getM_bagger());
             
-            try {
-                RandomForestUtils.setupBaggingClassifiers(bagger);
-            } catch (Exception e) {
-                throw new PMMLConversionException("Failed to initialize bagging classifiers.", e);
-            }
-            
-            Instances instances = PMMLUtils.buildInstances(pmml.getDataDictionary());
-            Classifier[] baggingClassifiers = RandomForestUtils.getBaggingClassifiers(bagger);
-            for (int i = 0; i < baggingClassifiers.length; i++) {
-                RandomTree root = (RandomTree) baggingClassifiers[i];
-                buildRandomTree(root, instances, (TreeModel) segments.get(i).getModel());
-            }
             return randomForest;
-        } catch (NoSuchFieldException | SecurityException | IllegalArgumentException | IllegalAccessException |
-                ClassNotFoundException | NoSuchMethodException | InstantiationException | InvocationTargetException ex) {
+        } catch (NoSuchFieldException | SecurityException | IllegalArgumentException | IllegalAccessException ex) {
             throw new PMMLConversionException(ex);
-        } 
+        }
+    }
+    
+    public RandomForestWrapper consumeWrapper(PMML pmml) throws PMMLConversionException {
+        MiningModel miningModel = PMMLUtils.getMiningModel(pmml);
+        List<Segment> segments = miningModel.getSegmentation().getSegments();
+
+        int m_numTrees = segments.size();
+
+        RandomForestWrapper randomForest = new RandomForestWrapper();
+        Bagging bagger = new Bagging();
+        bagger.setNumIterations(m_numTrees);
+        bagger.setClassifier(new RandomTreeWrapper());
+        randomForest.setM_bagger(bagger);
+
+        try {
+            RandomForestUtils.setupBaggingClassifiers(randomForest.getM_bagger());
+        } catch (Exception e) {
+            throw new PMMLConversionException("Failed to initialize bagging classifiers.", e);
+        }
+
+        Instances instances = PMMLUtils.buildInstances(pmml.getDataDictionary());
+
+        Classifier[] baggingClassifiers = RandomForestUtils.getBaggingClassifiers(randomForest.getM_bagger());
+
+        for (int i = 0; i < baggingClassifiers.length; i++) {
+            RandomTreeWrapper root = (RandomTreeWrapper) baggingClassifiers[i];
+            buildRandomTree(root, instances, (TreeModel) segments.get(i).getModel());
+        }
+
+        return randomForest;
     }
 
     /**
      * Builds a new {@link weka.classifiers.trees.RandomTree Weka RandomTree} from the given {@link org.dmg.pmml.TreeModel PMML TreeModel}.
-     *
-     * @param root      The {@link weka.classifiers.trees.RandomTree Weka RandomTree} which is to be built.
-     * @param instances The {@link weka.core.Instances} with the tree's attributes.
-     * @param treeModel The {@link org.dmg.pmml.TreeModel PMML TreeModel} which is to be converted to a {@link weka.classifiers.trees.RandomTree Weka RandomTree}.
-     * @return The same {@code root} instance.
      */
-    private static RandomTree buildRandomTree(RandomTree root, Instances instances, TreeModel treeModel) 
-            throws NoSuchFieldException, IllegalArgumentException, IllegalAccessException, ClassNotFoundException, 
-            NoSuchMethodException, InstantiationException, InvocationTargetException {
+    private static RandomTreeWrapper buildRandomTree(RandomTreeWrapper root, Instances instances, TreeModel treeModel) {
         Instances treeInstances = new Instances(instances);
         treeInstances.setClassIndex(PMMLUtils.getClassIndex(instances, treeModel));
 
-        Field field = RandomTree.class.getDeclaredField("m_Info");
-        field.setAccessible(true);
-        field.set(root, treeInstances);
-        field = RandomTree.class.getDeclaredField("m_Tree");
-        field.setAccessible(true);
-        field.set(root, buildRandomTreeNode(root, treeModel.getNode()));
+        root.setM_Info(treeInstances);
+        root.setM_Tree(buildRandomTreeNode(root, treeModel.getNode()));
 
         return root;
     }
@@ -134,34 +131,13 @@ public class RandomForestPMMLConsumer implements PMMLConsumer<RandomForest> {
     /**
      * Builds a {@link weka.classifiers.trees.RandomTree.Tree Weka RandomTree} node
      * represented by the given {@link org.dmg.pmml.Node PMML node}.
-     *
-     * @param tree     The {@link weka.classifiers.trees.RandomTree Weka RandomTree} which the returned tree node is part of.
-     * @param pmmlNode The {@link org.dmg.pmml.PMML PMML node} to be converted to a {@link weka.classifiers.trees.RandomTree.Tree Weka RandomTree} node.
-     * @return A new {@link weka.classifiers.trees.RandomTree.Tree Weka RandomTree} node.
      */
-    private static Object buildRandomTreeNode(RandomTree tree, Node pmmlNode) 
-            throws ClassNotFoundException, NoSuchMethodException, InstantiationException, 
-            IllegalAccessException, IllegalArgumentException, InvocationTargetException, NoSuchFieldException {
-        
-        RandomTree treeObj = new RandomTree();
-        Class<?> treeClass= Class.forName("weka.classifiers.trees.RandomTree$Tree");
-        Constructor<?> constructor = treeClass.getDeclaredConstructor(RandomTree.class);
-        constructor.setAccessible(true);
-        Object treeNode = constructor.newInstance(treeObj);
-        
-        Field field = treeClass.getDeclaredField("m_ClassDistribution");
-        field.setAccessible(true);
-        double [] distribution = PMMLUtils.getClassDistribution(pmmlNode);
-        if (distribution != null && distribution.length > 0) {
-            Object m_ClassDistribution = Array.newInstance(double.class, distribution.length);
-            for (int i = 0; i < distribution.length; i++)
-                 Array.set(m_ClassDistribution, i, distribution[i]);
-            field.set(treeNode, m_ClassDistribution);
-        }
+    private static RandomTreeWrapper.TreeWrapper buildRandomTreeNode(RandomTreeWrapper tree, Node pmmlNode) {
+        RandomTreeWrapper.TreeWrapper treeNode = tree.new TreeWrapper();
+        //Set the class distribution.
+        treeNode.setM_ClassDistribution(PMMLUtils.getClassDistribution(pmmlNode));
 
-        field = RandomTree.class.getDeclaredField("m_Info");
-        field.setAccessible(true);
-        Instances instances = Instances.class.cast(field.get(tree));
+        Instances instances = tree.getM_Info();
 
         boolean isLeaf = pmmlNode.getNodes().isEmpty();
 
@@ -171,9 +147,7 @@ public class RandomForestPMMLConsumer implements PMMLConsumer<RandomForest> {
             String attributeName = ((SimplePredicate) children.get(0).getPredicate()).getField().getValue();
             Attribute attribute = instances.attribute(attributeName);
 
-            field = treeClass.getDeclaredField("m_Attribute");
-            field.setAccessible(true);
-            field.setInt(treeNode, attribute.index());
+            treeNode.setM_Attribute(attribute.index());
 
             if (attribute.isNumeric()) {
 
@@ -187,51 +161,29 @@ public class RandomForestPMMLConsumer implements PMMLConsumer<RandomForest> {
 
                 assert leftPredicate instanceof SimplePredicate && 
                        leftPredicate.getClass().equals(rightPredicate.getClass()) : 
-                       "Numeric attribute's nodes must have the same simple predicate";
+                       "Numeric attribute's nodes must have the same simple predicate.";
 
                 double splitPoint = Double.valueOf(((SimplePredicate) leftPredicate).getValue());
 
-                field = treeClass.getDeclaredField("m_SplitPoint");
-                field.setAccessible(true);
-                field.set(treeNode, splitPoint);
-                
-                field = treeClass.getDeclaredField("m_Successors");
-                field.setAccessible(true);
-                Object m_Successors = Array.newInstance(treeClass, 2);
-                Array.set(m_Successors, 0, buildRandomTreeNode(tree, left) );
-                Array.set(m_Successors, 1, buildRandomTreeNode(tree, right) );
-                field.set(treeNode, m_Successors);
-                
-                field = treeClass.getDeclaredField("m_Prop");
-                field.setAccessible(true);
-                Object m_Props = Array.newInstance(double.class, 2);
-                Array.setDouble(m_Props, 0, PMMLUtils.getNodeTrainingProportion(left));
-                Array.setDouble(m_Props, 1, PMMLUtils.getNodeTrainingProportion(right));
-                field.set(treeNode, m_Props);
-                
+                treeNode.setM_SplitPoint(splitPoint);
+                treeNode.setM_Successors(new RandomTreeWrapper.TreeWrapper[]{buildRandomTreeNode(tree, left), buildRandomTreeNode(tree, right)});
+                treeNode.setM_Prop(new double[]{PMMLUtils.getNodeTrainingProportion(left), 
+                    PMMLUtils.getNodeTrainingProportion(right)});
             } else if (attribute.isNominal()) {
- 
-                Object m_Successors = Array.newInstance(treeClass, children.size());
-                Object m_Props = Array.newInstance(double.class, children.size());
+
+                treeNode.setM_Successors(new RandomTreeWrapper.TreeWrapper[children.size()]);
+                treeNode.setM_Prop(new double[treeNode.getM_Successors().length]);
 
                 for (Node child : children) {
                     SimplePredicate predicate = (SimplePredicate) child.getPredicate();
                     int valueIndex = attribute.indexOfValue(predicate.getValue());
                     
-                    Array.set(m_Successors, valueIndex, buildRandomTreeNode(tree, child));
-                    Array.set(m_Props, valueIndex, PMMLUtils.getNodeTrainingProportion(child));
+                    treeNode.setM_Successor(buildRandomTreeNode(tree, child), valueIndex);
+                    treeNode.setM_Prop(PMMLUtils.getNodeTrainingProportion(child), valueIndex);
                 }
-                
-                field = treeClass.getDeclaredField("m_Successors");
-                field.setAccessible(true);
-                field.set(treeNode, m_Successors);
-                
-                field = treeClass.getDeclaredField("m_Prop");
-                field.setAccessible(true);
-                field.set(treeNode, m_Props);
             } else {
                 throw new RuntimeException("Attribute type not supported: " + attribute);
-            }               
+            }
         }
 
         return treeNode;
