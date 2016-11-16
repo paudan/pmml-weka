@@ -12,11 +12,13 @@ import weka.classifiers.Classifier;
 import weka.classifiers.trees.RandomForest;
 import weka.core.Instances;
 
-public class BasicPMMLTest {
+public class BasicTest {
     
     @Test
     public void testIrisReflection() throws Exception {
-        File dataset = new File("test//resources//credit-german.arff");
+        ClassLoader classLoader = getClass().getClassLoader();
+        File dataset = new File(classLoader.getResource("credit-german.arff").getFile());
+        //File dataset = Paths.get("test", "resources", "credit-german.arff").toFile();
         Instances data;
         try (BufferedReader reader = new BufferedReader(new FileReader(dataset))) {
             data = new Instances(reader);
@@ -28,7 +30,9 @@ public class BasicPMMLTest {
     
     @Test
     public void testShuttleReflection() throws Exception {
-        File dataset = new File("test//resources//shuttle-landing-control.arff");
+        ClassLoader classLoader = getClass().getClassLoader();
+        File dataset = new File(classLoader.getResource("shuttle-landing-control.arff").getFile());
+        //File dataset = Paths.get("test", "resources", "shuttle-landing-control.arff").toFile();
         Instances data;
         try (BufferedReader reader = new BufferedReader(new FileReader(dataset))) {
             data = new Instances(reader);
