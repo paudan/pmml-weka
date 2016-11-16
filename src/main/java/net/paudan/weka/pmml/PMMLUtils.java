@@ -115,7 +115,7 @@ public final class PMMLUtils {
      */
     public static Header buildPMMLHeader(String description) {
         Header header = new Header();
-        header.setCopyright("www.dmg.org");
+        //header.setCopyright("www.dmg.org");
         header.setDescription(description);
         return header;     
     }
