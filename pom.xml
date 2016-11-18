@@ -22,6 +22,24 @@
             <groupId>com.github.jpmml</groupId>
             <artifactId>jpmml-model</artifactId>
             <version>1.2.17</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.github.jpmml.jpmml-model</groupId>
+                    <artifactId>pmml-model-metro</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.github.jpmml.jpmml-model</groupId>
+                    <artifactId>pmml-xjc</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.github.jpmml.jpmml-model</groupId>
+                    <artifactId>pmml-model-gwt</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.eclipse.persistence</groupId>
+                    <artifactId>org.eclipse.persistence.moxy</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>junit</groupId>
