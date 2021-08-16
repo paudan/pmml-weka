@@ -321,7 +321,6 @@ public final class PMMLUtils {
                 return (MiningModel) model;
             }
         }
-
         throw new RuntimeException("PMML MiningModel not found.");
     }
 }
