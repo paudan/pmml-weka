@@ -32,7 +32,6 @@ import org.dmg.pmml.Value;
 import org.jpmml.model.JAXBUtil;
 import weka.classifiers.Classifier;
 import weka.classifiers.RandomForestUtils;
-import weka.classifiers.meta.Bagging;
 import weka.classifiers.trees.RandomForest;
 import weka.classifiers.trees.RandomTree;
 import weka.core.Instances;
@@ -65,14 +64,10 @@ public class RandomForestPMMLProducer implements PMMLProducer<RandomForest> {
         PMML pmml = new PMML("4.2", header, new DataDictionary());
         try {
             // Get the Instances from the first tree in the forest.
-            Field field = RandomForest.class.getDeclaredField("m_bagger");
+            Classifier[] baggingClassifiers = RandomForestUtils.getBaggingClassifiers(randomForestClassifier);
+            Field field = RandomTree.class.getDeclaredField("m_Info");
             field.setAccessible(true);
-            Bagging bagger = (Bagging) field.get(randomForestClassifier);
-            
-            Classifier[] baggingClassifiers = RandomForestUtils.getBaggingClassifiers(bagger);
-            field = RandomTree.class.getDeclaredField("m_Info");
-            field.setAccessible(true);
-            Instances data = (Instances) field.get((RandomTree) baggingClassifiers[0]);
+            Instances data = (Instances) field.get(baggingClassifiers[0]);
 
             // Builds the PMML DataDictionary and MiningSchema elements.
             DataDictionary dataDictionary = new DataDictionary();
@@ -92,7 +87,7 @@ public class RandomForestPMMLProducer implements PMMLProducer<RandomForest> {
                     DataField dataField = new DataField(new FieldName(attribute.name()), attribute.isNominal() ?
                             OpType.CATEGORICAL : OpType.CONTINUOUS, fieldType);
                     if (attribute.isNominal()) {
-                        Enumeration enumeration = attribute.enumerateValues();
+                        Enumeration<Object> enumeration = attribute.enumerateValues();
                         while (enumeration.hasMoreElements()) {
                             dataField.addValues(new Value(String.valueOf(enumeration.nextElement())));
                         }
@@ -121,13 +116,11 @@ public class RandomForestPMMLProducer implements PMMLProducer<RandomForest> {
             Segmentation segmentation = new Segmentation();
             segmentation.setMultipleModelMethod(MultipleModelMethodType.MAJORITY_VOTE);
             miningModel.setSegmentation(segmentation);
-            
-            if (bagger != null) {
-                int segmentId = 1;
-                for (Classifier classifier : RandomForestUtils.getBaggingClassifiers(bagger)) {
-                    Segment segment = buildSegment(miningSchema, segmentId++, (RandomTree) classifier);
-                    segmentation.addSegments(segment);
-                }
+
+            int segmentId = 1;
+            for (Classifier classifier : RandomForestUtils.getBaggingClassifiers(randomForestClassifier)) {
+                Segment segment = buildSegment(miningSchema, segmentId++, (RandomTree) classifier);
+                segmentation.addSegments(segment);
             }
         } catch (NoSuchFieldException | SecurityException | IllegalArgumentException | IllegalAccessException | ClassNotFoundException ex) {
             throw new PMMLConversionException(ex);
@@ -187,7 +180,7 @@ public class RandomForestPMMLProducer implements PMMLProducer<RandomForest> {
         Class<?> treeClass = Class.forName("weka.classifiers.trees.RandomTree$Tree");
         field = treeClass.getDeclaredField("m_ClassDistribution");
         field.setAccessible(true);
-        double[] m_classDistribution = double[].class.cast(field.get(node));
+        double[] m_classDistribution = (double[]) field.get(node);
         field = treeClass.getDeclaredField("m_Attribute");
         field.setAccessible(true);
         int m_attribute = field.getInt(node);
@@ -241,7 +234,7 @@ public class RandomForestPMMLProducer implements PMMLProducer<RandomForest> {
     private static int buildNominalNode(RandomTree tree, Attribute attribute, Object node, int nodeId, Node parentPMMLNode) 
             throws ClassNotFoundException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
         List<Object> values = new ArrayList<>();
-        Enumeration enumeration = attribute.enumerateValues();
+        Enumeration<Object> enumeration = attribute.enumerateValues();
         while (enumeration.hasMoreElements()) {
             values.add(enumeration.nextElement());
         }
@@ -249,10 +242,10 @@ public class RandomForestPMMLProducer implements PMMLProducer<RandomForest> {
         Class<?> treeClass = Class.forName("weka.classifiers.trees.RandomTree$Tree");
         Field field = treeClass.getDeclaredField("m_Successors");
         field.setAccessible(true);
-        Object[] m_Successors = Object[].class.cast(field.get(node));
+        Object[] m_Successors = (Object[]) field.get(node);
         field = treeClass.getDeclaredField("m_Prop");
         field.setAccessible(true);
-        double[] m_Prop = double[].class.cast(field.get(node));
+        double[] m_Prop = (double[]) field.get(node);
 
         List<Node> children = new ArrayList<>();
 
@@ -310,10 +303,10 @@ public class RandomForestPMMLProducer implements PMMLProducer<RandomForest> {
         Class<?> treeClass= Class.forName("weka.classifiers.trees.RandomTree$Tree");
         Field field = treeClass.getDeclaredField("m_Successors");
         field.setAccessible(true);
-        Object[] m_Successors = Object[].class.cast(field.get(node));
+        Object[] m_Successors = (Object[]) field.get(node);
         field = treeClass.getDeclaredField("m_Prop");
         field.setAccessible(true);
-        double[] m_Prop = double[].class.cast(field.get(node));
+        double[] m_Prop = (double[]) field.get(node);
         field = treeClass.getDeclaredField("m_SplitPoint");
         field.setAccessible(true);
         double m_SplitPoint = field.getDouble(node);
